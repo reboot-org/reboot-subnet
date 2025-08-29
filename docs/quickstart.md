@@ -5,6 +5,10 @@
 The `netuid` for `reboot`:
 * mainnet: `47`
 
+## Minimum Hardware Requirements
+* CPU: 16 cores
+* Memory: 16 GB
+* Disk: 50GB
 
 ### Prepare Wallet
 
