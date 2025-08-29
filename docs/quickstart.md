@@ -6,22 +6,19 @@ The `netuid` for `reboot`:
 * mainnet: `47`
 
 ## Minimum Hardware Requirements
-* CPU: 16 cores
+* CPU: 16 cores (x86-64)
 * Memory: 16 GB
 * Disk: 50GB
+
+## Software Requirements
+* Ubuntu 22.04 or higher
+* Python 3.10 or higher
 
 ### Prepare Wallet
 
 Generally, for both validator and miner, you need to prepare your wallet and make your key registered in the subnet. 
 
 ### Install requirements
-
-In the root folder of this repository, run the following command:
-```bash
-python -m pip install --no-cache-dir -e .
-```
-
-## Miner Setup
 
 #### Install Docker
 
@@ -99,22 +96,32 @@ Then you have successfully installed and started Docker Engine.
 cd simulator && make docker-build && cd -
 ```
 
+### Install Requiremnets
+In the root folder of this repository, run the following command:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
 ### Start the Miner
 
 You can start the miner by running the following command:
 
 ```bash
-PYTHONPATH=. python neurons/miner.py --netuid 47 --wallet.name test-miner --wallet.hotkey default --logging.debug --blacklist.force_validator_permit
+source venv/bin/activate
+
+PYTHONPATH=. python3 neurons/miner.py --netuid 47 --wallet.name your-miner-wallet --wallet.hotkey default --logging.debug --blacklist.force_validator_permit
 ```
 
 ## Validator Setup
 
 ### Start the Validator
 
-You can start the miner by running the following command:
+You can start the validator by running the following command:
 
 ```bash
-PYTHONPATH=. python neurons/validator.py --netuid 47 --wallet.name test-vali --wallet.hotkey default --logging.debug
+source venv/bin/activate
 
+PYTHONPATH=. python3 neurons/validator.py --netuid 47 --wallet.name your-vali-wallet --wallet.hotkey default --logging.debug
 ```
