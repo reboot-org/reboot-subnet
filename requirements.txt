@@ -8,6 +8,6 @@ torch>=2
 numpy>=1
 setuptools>=68
 docker>=6.0.0
-bittensor>=9.9.0
+bittensor>=9.10.1
 bittensor-cli>=9.10.1
 Pillow

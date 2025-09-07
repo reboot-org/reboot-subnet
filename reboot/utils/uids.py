@@ -62,3 +62,9 @@ def get_random_uids(self, k: int, exclude: List[int] = None) -> np.ndarray:
         )
     uids = np.array(random.sample(available_uids, k))
     return uids
+
+def get_all_uids(self):
+    candidate_uids = []
+    for uid in range(self.metagraph.n.item()):
+        candidate_uids.append(uid)
+    return candidate_uids

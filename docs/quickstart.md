@@ -92,6 +92,7 @@ docker ps
 Then you have successfully installed and started Docker Engine.
 
 ### Build Image
+**ATTENTION**: Remember to rerun this command after every code update.
 ```bash
 cd simulator && make docker-build && cd -
 ```

@@ -71,28 +71,32 @@ def calculate_image_similarity(img1_bytes: bytes, img2_bytes: bytes) -> float:
         bt.logging.warning(f"Error calculating image similarity: {e}")
         return 0.0
 
-def reward(map_b64: str, synapse: RobotSynapse) -> float:
+def reward(validator_image_bytes: bytes, synapse: RobotSynapse) -> float:
     """
-    Reward the miner response to the dummy request. This method returns a reward
+    Reward the miner response based on camera image similarity. This method returns a reward
     value for the miner, which is used to update the miner's score.
 
     Args:
-        map_bytes: The expected map image bytes
+        validator_image_bytes: The validator's camera image bytes
         synapse: The synapse containing the miner's response
         
     Returns:
         float: The reward value for the miner (0.0 to 1.0).
     """
     # Get the miner's response
-    if synapse.output is None or synapse.output.map_b64 is None:
-        bt.logging.warning("No output or map_bytes in synapse")
+    if synapse.output is None or synapse.output.img_b64 is None:
+        bt.logging.warning("No output or img_b64 in synapse")
         return 0.0
     
-    validator_map_bytes = base64.b64decode(map_b64)
-    miner_map_bytes = base64.b64decode(synapse.output.map_b64)
+    try:
+        validator_camera_bytes = validator_image_bytes
+        miner_camera_bytes = base64.b64decode(synapse.output.img_b64)
+    except Exception as e:
+        bt.logging.warning(f"Error decoding images: {e}")
+        return 0.0
     
     # Calculate image similarity (0.0 to 1.0)
-    similarity_score = calculate_image_similarity(validator_map_bytes, miner_map_bytes)
+    similarity_score = calculate_image_similarity(validator_camera_bytes, miner_camera_bytes)
     
     # Get processing time from dendrite
     processing_time = getattr(synapse.dendrite, 'process_time', None)
@@ -121,6 +125,7 @@ def get_rewards(
     self,
     query: int,
     responses: List[RobotSynapse],
+    validator_image: bytes = None,
 ) -> np.ndarray:
     """
     Returns an array of rewards for the given query and responses.
@@ -128,9 +133,14 @@ def get_rewards(
     Args:
     - query (int): The query sent to the miner.
     - responses (List[RobotSynapse]): A list of responses from the miners.
+    - validator_image (bytes): The validator's camera image for comparison.
 
     Returns:
     - np.ndarray: An array of rewards for the given query and responses.
     """
     # Get all the reward results by iteratively calling your reward() function.
-    return np.array([reward(self.mapbytes, response) for response in responses])
+    if validator_image:
+        return np.array([reward(validator_image, response) for response in responses])
+    else:
+        # Fallback to old behavior if no validator image
+        return np.array([reward(self.mapbytes, response) for response in responses])

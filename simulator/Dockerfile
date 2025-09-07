@@ -40,8 +40,6 @@ RUN apt-get install -y --no-install-recommends \
 
 RUN pip3 install --ignore-installed numpy==1.26.4 opencv-python ffmpeg-python
 
-COPY api_server /root/ros2_ws/src/api_server
-
 ENV QT_QPA_PLATFORM xcb
 ENV DISPLAY :0
 
@@ -73,6 +71,8 @@ ENV TURTLEBOT3_MODEL waffle_pi
 ENV ROS_DOMAIN_ID 30
 RUN echo 'source /usr/share/gazebo/setup.bash' >> /root/.bashrc
 RUN echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc
+
+COPY api_server /root/ros2_ws/src/api_server
 
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

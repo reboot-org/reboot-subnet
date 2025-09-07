@@ -17,6 +17,7 @@
 import os
 import time
 import typing
+import json
 import bittensor as bt
 from controller.docker_controller import DockerController
 from reboot.protocol import RobotSynapse, RobotOutput
@@ -33,26 +34,120 @@ class Miner(BaseMinerNeuron):
         super(Miner, self).__init__(config=config)
         self.controller = DockerController(container_name="ros2-sn", image="reboot-subnet-simulator:latest")
 
-    def run_job(self):
+    def parse_action_strings(self, action_strings):
+        """Parse action strings into action dictionaries"""
+        actions = []
+        for action_str in action_strings:
+            parts = action_str.split(',')
+            if len(parts) >= 1:
+                action = {'type': parts[0].strip()}
+                if len(parts) >= 2:
+                    try:
+                        action['speed'] = float(parts[1].strip())
+                    except ValueError:
+                        action['speed'] = 0.5
+                if len(parts) >= 3:
+                    try:
+                        action['duration'] = float(parts[2].strip())
+                    except ValueError:
+                        action['duration'] = 1.0
+                actions.append(action)
+        return actions
+
+    def execute_movement_sequence(self, actions):
+        """Execute movement sequence in the container"""
+        # Convert actions to JSON string for robot_movement.py
+        actions_json = json.dumps(actions)
+        
+        # Execute the movement sequence
+        result = self.controller.execute_command(
+            command=f'bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/robot_movement.py \'{actions_json}\'"'
+        )
+        
+        bt.logging.info(f"Movement sequence executed: {result}")
+        return result
+
+    def capture_camera_image(self, image_path="/tmp/camera_image.png"):
+        """Capture camera image from the container"""
+        # Execute get_camera_image.py
+        result = self.controller.execute_command(
+            command=f'bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/get_camera_image.py {image_path}"'
+        )
+        
+        bt.logging.info(f"Camera capture result: {result}")
+        
+        # Download the captured image
+        try:
+            image_bytes = self.controller.download_file_content(container_path=image_path)
+            bt.logging.info(f"Camera image downloaded: {len(image_bytes)} bytes")
+            return image_bytes
+        except Exception as e:
+            bt.logging.error(f"Failed to download camera image: {e}")
+            return None
+
+    def run_job(self, actions=None):
         home_path = os.getenv("HOME")
         self.controller.start_container(environment={"TURTLEBOT3_MODE": "waffle_pi"}, ports={"5000": 5000, "8888": 8888}, volumes={f'{home_path}/.gz': {'bind': '/root/.gz', 'mode': 'rw'}}, command="sleep infinity", clean_existing=True)
-        self.controller.start_process(process_name="gazebo", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_gazebo turtlebot3_dqn_stage1.launch.py > /root/ros2_ws/gz.log"')
+        self.controller.start_process(process_name="gazebo", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_world.launch.py > /root/ros2_ws/gz.log"')
         time.sleep(10)
         self.controller.start_process(process_name="rosboard", command='bash -c "/usr/local/bin/docker-entrypoint.sh ros2 run rosboard rosboard_node > /root/ros2_ws/rosboard.log"')
         time.sleep(10)
         self.controller.start_process(process_name="cartographer", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True > /root/ros2_ws/cartographer.log"')
         time.sleep(20)
-        self.controller.execute_command(command='bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/get_map.py /tmp/map.png"')
-        mapbytes = self.controller.download_file_content(container_path="/tmp/map.png")
-        b64data = base64.b64encode(mapbytes).decode('utf-8')
-        print("received map", mapbytes[:20])
-        return b64data
+
+        # Execute robot movement if actions are provided
+        if actions:
+            actions_json = json.dumps(actions)
+            actions_b64 = base64.b64encode(actions_json.encode('utf-8')).decode('utf-8')
+            result = self.controller.execute_command(
+                command=f'bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/robot_movement.py --base64 \'{actions_b64}\'"'
+            )
+            bt.logging.info(f"Robot movement executed: {result}")
+            time.sleep(5)
+
+        image_path="/tmp/camera_image.png"
+        result = self.controller.execute_command(
+            command=f'bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/get_camera_image.py {image_path}"'
+        )
+        # bt.logging.info(f"Camera capture result: {result}")
+        
+        try:
+            image_bytes = self.controller.download_file_content(container_path=image_path)
+            bt.logging.info(f"Camera image downloaded: {len(image_bytes)} bytes")
+            return image_bytes
+        except Exception as e:
+            bt.logging.error(f"Failed to download camera image: {e}")
+            return None
+
     
     async def forward(
         self, synapse: RobotSynapse
     ) -> RobotSynapse:
-        result = self.run_job()
-        synapse.output = RobotOutput(map_b64=result)
+        # 打印收到的action_seqs
+        if hasattr(synapse.input, 'action_seqs') and synapse.input.action_seqs:
+            bt.logging.info(f"Received action_seqs: {synapse.input.action_seqs}")
+            
+            # Parse action strings into movement sequence
+            actions = self.parse_action_strings(synapse.input.action_seqs)
+            bt.logging.info(f"Parsed actions: {actions}")            
+            
+            # Run job with actions
+            miner_image_bytes = self.run_job(actions=actions)
+            
+            if miner_image_bytes:
+                # Convert to base64 for response
+                miner_image_b64 = base64.b64encode(miner_image_bytes).decode('utf-8')
+                bt.logging.info(f"Miner camera image captured: {len(miner_image_bytes)} bytes")
+            else:
+                miner_image_b64 = ""
+                bt.logging.warning("Failed to capture miner camera image")
+                
+        else:
+            print("No action_seqs received")
+            bt.logging.info("No action_seqs received")
+            miner_image_b64 = ""
+        
+        synapse.output = RobotOutput(img_b64=miner_image_b64)
         return synapse
 
     async def blacklist(

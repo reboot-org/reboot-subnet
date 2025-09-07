@@ -20,10 +20,11 @@ import bittensor as bt
 
 
 class RobotInput(bt.Synapse):
-    pass
+    action_seqs: typing.List[str] = []
+    validator_image_b64: str = ""
 
 class RobotOutput(bt.Synapse):
-    map_b64: str
+    img_b64: str
 
 class RobotSynapse(bt.Synapse):
     # Required request input, filled by sending dendrite caller.
