@@ -80,7 +80,7 @@ class Validator(BaseValidatorNeuron):
 
     def run_job(self, actions=None):
         home_path = os.getenv("HOME")
-        self.controller.start_container(environment={"TURTLEBOT3_MODE": "waffle_pi"}, ports={"5000": 5001, "8888": 8889}, volumes={f'{home_path}/.gz': {'bind': '/root/.gz', 'mode': 'rw'}}, command="sleep infinity", clean_existing=True)
+        self.controller.start_container(environment={"TURTLEBOT3_MODE": "waffle_pi"}, ports={"5000": 5001, "8888": 8889}, volumes={f'{home_path}/.gz_validator': {'bind': '/root/.gz', 'mode': 'rw'}}, command="sleep infinity", clean_existing=True)
         time.sleep(10)
         self.controller.start_process(process_name="gazebo", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py > /root/ros2_ws/gz.log"')
         time.sleep(10)
