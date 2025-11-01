@@ -191,7 +191,7 @@ def add_validator_args(cls, parser):
         "--neuron.num_concurrent_forwards",
         type=int,
         help="The number of concurrent forwards running at any time.",
-        default=1,
+        default=20,
     )
 
     parser.add_argument(
@@ -244,6 +244,34 @@ def add_validator_args(cls, parser):
         type=str,
         help="The name of the project where you are sending the new run.",
         default="opentensor-dev",
+    )
+
+    parser.add_argument(
+        "--enable_api",
+        action="store_true",
+        help="Enable HTTP API server for external requests.",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--api_port",
+        type=int,
+        help="Port for HTTP API server.",
+        default=8080,
+    )
+
+    parser.add_argument(
+        "--api_host",
+        type=str,
+        help="Host for HTTP API server.",
+        default="0.0.0.0",
+    )
+
+    parser.add_argument(
+        "--api_token",
+        type=str,
+        help="Token for HTTP API authentication. If not set, API will be open without authentication.",
+        default=None,
     )
 
 

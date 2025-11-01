@@ -11,3 +11,7 @@ docker>=6.0.0
 bittensor>=9.10.1
 bittensor-cli>=9.10.1
 Pillow
+# FastAPI dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
