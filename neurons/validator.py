@@ -339,20 +339,43 @@ class FastAPIValidator:
     async def process_robot_action(self, actions: List[Dict]):
         """Core logic for processing robot actions"""
         try:
-            # Get 3 random miner UIDs
+            # Get vault UID to exclude it from selection
+            vault_uid = None
+            if hasattr(self.validator, 'vault_hotkey') and self.validator.vault_hotkey:
+                try:
+                    if self.validator.vault_hotkey in self.validator.metagraph.hotkeys:
+                        vault_uid = self.validator.metagraph.hotkeys.index(self.validator.vault_hotkey)
+                        bt.logging.info(f"Found vault UID to exclude: {vault_uid}")
+                except Exception as e:
+                    bt.logging.warning(f"Error finding vault UID: {e}")
+            
+            # Get available miner UIDs and their scores, excluding vault
             available_uids = []
+            uid_scores = []
+            
             for uid in range(self.validator.metagraph.n.item()):
+                # Skip vault UID
+                if uid == vault_uid:
+                    continue
+                    
                 if self.validator.metagraph.axons[uid].is_serving:
                     available_uids.append(uid)
+                    # Get the score for this UID from our validator's local scores
+                    uid_scores.append(self.validator.scores[uid])
             
             if len(available_uids) < 3:
                 return {
                     "success": False,
-                    "error": f"Not enough available miners. Found {len(available_uids)}, need 3"
+                    "error": f"Not enough available miners (excluding vault). Found {len(available_uids)}, need 3"
                 }
             
-            selected_uids = random.sample(available_uids, 3)
-            bt.logging.info(f"Selected miner UIDs: {selected_uids}")
+            # Sort UIDs by score in descending order and select top 3
+            uid_score_pairs = list(zip(available_uids, uid_scores))
+            uid_score_pairs.sort(key=lambda x: x[1], reverse=True)
+            selected_uids = [uid for uid, score in uid_score_pairs[:3]]
+            
+            bt.logging.info(f"Selected top-scored miner UIDs (excluding vault): {selected_uids}")
+            bt.logging.info(f"Selected miner scores: {[score for uid, score in uid_score_pairs[:3]]}")
             
             # Convert actions to string format
             action_strings = []
