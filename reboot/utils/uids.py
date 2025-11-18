@@ -53,7 +53,7 @@ def get_random_uids(self, k: int, exclude: List[int] = None) -> np.ndarray:
                 candidate_uids.append(uid)
     # If k is larger than the number of available uids, set k to the number of available uids.
     k = min(k, len(avail_uids))
-    # Check if candidate_uids contain enough for querying, if not grab all avaliable uids
+    # Check if candidate_uids contain enough for querying, if not grab all available uids
     available_uids = candidate_uids
     if len(candidate_uids) < k:
         available_uids += random.sample(
