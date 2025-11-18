@@ -123,7 +123,6 @@ class Miner(BaseMinerNeuron):
     async def forward(
         self, synapse: RobotSynapse
     ) -> RobotSynapse:
-        # 打印收到的action_seqs
         if hasattr(synapse.input, 'action_seqs') and synapse.input.action_seqs:
             bt.logging.info(f"Received action_seqs: {synapse.input.action_seqs}")
             

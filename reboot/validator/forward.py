@@ -113,7 +113,7 @@ async def forward(self):
     movement_sequence = self.generate_random_movement_sequence(num_actions=5)
     bt.logging.info(f"Generated movement sequence: {movement_sequence}")
     
-    validator_image_bytes = self.run_job()
+    validator_image_bytes = self.run_job(actions=movement_sequence)
 
     validator_image_b64 = base64.b64encode(validator_image_bytes).decode('utf-8') if validator_image_bytes else ""
     
