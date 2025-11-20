@@ -41,7 +41,6 @@ from controller import DockerController
 
 from reboot.base.validator import BaseValidatorNeuron
 from reboot.protocol import RobotSynapse, RobotInput
-from reboot.utils.uids import get_random_uids
 
 # Bittensor Validator Template:
 from reboot.validator import forward
@@ -329,6 +328,7 @@ class FastAPIValidator:
                 )
                 
         except Exception as e:
+            #raise e
             bt.logging.error(f"Error in robot action task {task_id}: {e}")
             self.validator.task_manager.update_task_status(
                 task_id,
@@ -349,33 +349,36 @@ class FastAPIValidator:
                 except Exception as e:
                     bt.logging.warning(f"Error finding vault UID: {e}")
             
-            # Get available miner UIDs and their scores, excluding vault
+            # Get available miner UIDs and their weights, excluding vault
             available_uids = []
-            uid_scores = []
-            
+            uid_weights = []
             for uid in range(self.validator.metagraph.n.item()):
                 # Skip vault UID
                 if uid == vault_uid:
                     continue
-                    
                 if self.validator.metagraph.axons[uid].is_serving:
                     available_uids.append(uid)
-                    # Get the score for this UID from our validator's local scores
-                    uid_scores.append(self.validator.scores[uid])
+                    # Get the weight for this UID from metagraph
+                    uid_weights.append(self.validator.metagraph.weights[uid])
+
+            # Sort UIDs by weight in descending order
+            uid_weight_pairs = list(zip(available_uids, uid_weights))
+            uid_weight_pairs.sort(key=lambda x: x[1], reverse=True)
             
-            if len(available_uids) < 3:
-                return {
-                    "success": False,
-                    "error": f"Not enough available miners (excluding vault). Found {len(available_uids)}, need 3"
-                }
+            # Select top 20 UIDs by weight (or all if less than 20)
+            top_n = min(20, len(uid_weight_pairs))
+            top_uids = [uid for uid, weight in uid_weight_pairs[:top_n]]
             
-            # Sort UIDs by score in descending order and select top 3
-            uid_score_pairs = list(zip(available_uids, uid_scores))
-            uid_score_pairs.sort(key=lambda x: x[1], reverse=True)
-            selected_uids = [uid for uid, score in uid_score_pairs[:3]]
-            
-            bt.logging.info(f"Selected top-scored miner UIDs (excluding vault): {selected_uids}")
-            bt.logging.info(f"Selected miner scores: {[score for uid, score in uid_score_pairs[:3]]}")
+            # Randomly select 3 UIDs from the top 20 (or all if less than 20)
+            if len(top_uids) <= 3:
+                selected_uids = top_uids
+            else:
+                selected_uids = random.sample(top_uids, 3)
+
+            bt.logging.info(f"Available miners: {len(available_uids)}")
+            bt.logging.info(f"Top {top_n} miners by weight: {top_uids}")
+            bt.logging.info(f"Top {top_n} miner weights: {[weight for uid, weight in uid_weight_pairs[:top_n]]}")
+            bt.logging.info(f"Randomly selected miner UIDs from top {top_n}: {selected_uids}")
             
             # Convert actions to string format
             action_strings = []
@@ -391,13 +394,18 @@ class FastAPIValidator:
             # Create synapse
             synapse = RobotSynapse(input=RobotInput(action_seqs=action_strings))
             
-            # Send requests to selected miners
-            responses = await self.validator.dendrite(
-                axons=[self.validator.metagraph.axons[uid] for uid in selected_uids],
-                synapse=synapse,
-                deserialize=False,
-                timeout=120,
-            )
+            # Send requests to selected miners with event loop safety
+            try:
+                responses = await self.validator.dendrite(
+                    axons=[self.validator.metagraph.axons[uid] for uid in selected_uids],
+                    synapse=synapse,
+                    deserialize=False,
+                    timeout=120,
+                )
+                bt.logging.debug(f"Successfully received {len(responses)} responses from miners")
+            except Exception as e:
+                bt.logging.error(f"Error during dendrite communication: {e}")
+                raise
             
             # Collect results
             results = []
@@ -472,7 +480,6 @@ class Validator(BaseValidatorNeuron):
             # Create FastAPI app
             self.fastapi_app = FastAPIValidator(self)
             
-            # Configure uvicorn
             config = uvicorn.Config(
                 app=self.fastapi_app.app,
                 host=self.http_host,
