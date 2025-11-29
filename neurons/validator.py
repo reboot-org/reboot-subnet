@@ -34,7 +34,6 @@ from reboot.validator import forward
 class Validator(BaseValidatorNeuron):
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
-        self._lock = threading.Lock()
 
         bt.logging.info("load_state()")
         self.load_state()
