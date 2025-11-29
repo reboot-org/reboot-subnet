@@ -55,8 +55,7 @@ class Validator(BaseValidatorNeuron):
             else:
                 bt.logging.warning(f"Vault hotkey {self.vault_hotkey} not found in metagraph")
                 return None
-        except E        self._lock = threading.Lock()
-xception as e:
+        except Exception as e:
             bt.logging.error(f"Error finding vault UID: {e}")
             return None
     
