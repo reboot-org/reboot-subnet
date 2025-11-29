@@ -365,7 +365,7 @@ class Gateway:
                     axons=[metagraph.axons[uid] for uid in selected_uids],
                     synapse=synapse,
                     deserialize=False,
-                    timeout=120,
+                    timeout=180,
                 )
                 bt.logging.debug(f"Successfully received {len(responses)} responses from miners")
             except Exception as e:

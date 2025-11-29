@@ -24,6 +24,7 @@ from reboot.protocol import RobotSynapse, RobotOutput
 import base64
 
 import reboot
+import threading
 
 # import base miner class which takes care of most of the boilerplate
 from reboot.base.miner import BaseMinerNeuron
@@ -32,6 +33,7 @@ from reboot.base.miner import BaseMinerNeuron
 class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
+        self._lock = threading.Lock()
         self.controller = DockerController(container_name="ros2-sn", image="reboot-subnet-simulator:latest")
 
     def parse_action_strings(self, action_strings):
@@ -89,11 +91,11 @@ class Miner(BaseMinerNeuron):
         home_path = os.getenv("HOME")
         self.controller.start_container(environment={"TURTLEBOT3_MODE": "waffle_pi"}, volumes={f'{home_path}/.gz_miner': {'bind': '/root/.gz', 'mode': 'rw'}}, command="sleep infinity", clean_existing=True)
         self.controller.start_process(process_name="gazebo", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py > /root/ros2_ws/gz.log"')
-        time.sleep(10)
+        time.sleep(5)
         self.controller.start_process(process_name="rosboard", command='bash -c "/usr/local/bin/docker-entrypoint.sh ros2 run rosboard rosboard_node > /root/ros2_ws/rosboard.log"')
-        time.sleep(10)
+        time.sleep(5)
         self.controller.start_process(process_name="cartographer", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True > /root/ros2_ws/cartographer.log"')
-        time.sleep(20)
+        time.sleep(5)
 
         # Execute robot movement if actions are provided
         if actions:
@@ -123,31 +125,32 @@ class Miner(BaseMinerNeuron):
     async def forward(
         self, synapse: RobotSynapse
     ) -> RobotSynapse:
-        if hasattr(synapse.input, 'action_seqs') and synapse.input.action_seqs:
-            bt.logging.info(f"Received action_seqs: {synapse.input.action_seqs}")
-            
-            # Parse action strings into movement sequence
-            actions = self.parse_action_strings(synapse.input.action_seqs)
-            bt.logging.info(f"Parsed actions: {actions}")            
-            
-            # Run job with actions
-            miner_image_bytes = self.run_job(actions=actions)
-            
-            if miner_image_bytes:
-                # Convert to base64 for response
-                miner_image_b64 = base64.b64encode(miner_image_bytes).decode('utf-8')
-                bt.logging.info(f"Miner camera image captured: {len(miner_image_bytes)} bytes")
-            else:
-                miner_image_b64 = ""
-                bt.logging.warning("Failed to capture miner camera image")
+        with self._lock:
+            if hasattr(synapse.input, 'action_seqs') and synapse.input.action_seqs:
+                bt.logging.info(f"Received action_seqs: {synapse.input.action_seqs}")
                 
-        else:
-            print("No action_seqs received")
-            bt.logging.info("No action_seqs received")
-            miner_image_b64 = ""
-        
-        synapse.output = RobotOutput(img_b64=miner_image_b64)
-        return synapse
+                # Parse action strings into movement sequence
+                actions = self.parse_action_strings(synapse.input.action_seqs)
+                bt.logging.info(f"Parsed actions: {actions}")            
+                
+                # Run job with actions
+                miner_image_bytes = self.run_job(actions=actions)
+                
+                if miner_image_bytes:
+                    # Convert to base64 for response
+                    miner_image_b64 = base64.b64encode(miner_image_bytes).decode('utf-8')
+                    bt.logging.info(f"Miner camera image captured: {len(miner_image_bytes)} bytes")
+                else:
+                    miner_image_b64 = ""
+                    bt.logging.warning("Failed to capture miner camera image")
+                    
+            else:
+                print("No action_seqs received")
+                bt.logging.info("No action_seqs received")
+                miner_image_b64 = ""
+            
+            synapse.output = RobotOutput(img_b64=miner_image_b64)
+            return synapse
 
     async def blacklist(
         self, synapse: RobotSynapse

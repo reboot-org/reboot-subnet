@@ -128,7 +128,7 @@ async def forward(self):
         axons=[self.metagraph.axons[uid] for uid in miner_uids],
         synapse=input,
         deserialize=False,
-        timeout=120,
+        timeout=180,
     )
 
     # Log the results for monitoring purposes.
@@ -144,4 +144,4 @@ async def forward(self):
     bt.logging.info(f"Adjusted rewards after vault distribution: {adjusted_rewards}")
     # Update the scores based on the adjusted rewards.
     self.update_scores(adjusted_rewards, miner_uids)
-    time.sleep(5)
+    time.sleep(random.randint(60, 120))
