@@ -98,25 +98,15 @@ def reward(validator_image_bytes: bytes, synapse: RobotSynapse) -> float:
     # Calculate image similarity (0.0 to 1.0)
     similarity_score = calculate_image_similarity(validator_camera_bytes, miner_camera_bytes)
     
+    if similarity_score < 0.7:
+        similarity_score = 0
+
     # Get processing time from dendrite
     processing_time = getattr(synapse.dendrite, 'process_time', None)
     
-    if processing_time is None:
-        bt.logging.warning("No processing time available in synapse")
-        # If no processing time, only use similarity score
-        return similarity_score
+    final_reward = similarity_score
     
-    # Convert processing time to time penalty (0.0 to 1.0)
-    # Longer processing time = lower score
-    # Use exponential decay for time penalty
-    max_expected_time = 120.0
-    time_penalty = np.exp(-processing_time / max_expected_time)
-    
-    # Combine similarity and time penalty
-    # Weight: 80% similarity, 20% time penalty
-    final_reward = 0.8 * similarity_score + 0.2 * time_penalty
-    
-    bt.logging.info(f"Similarity: {similarity_score:.3f}, Time penalty: {time_penalty:.3f}, Final reward: {final_reward:.3f}")
+    bt.logging.info(f"Similarity: {similarity_score:.3f}, Final reward: {final_reward:.3f}")
     
     return float(final_reward)
 
@@ -139,8 +129,5 @@ def get_rewards(
     - np.ndarray: An array of rewards for the given query and responses.
     """
     # Get all the reward results by iteratively calling your reward() function.
-    if validator_image:
-        return np.array([reward(validator_image, response) for response in responses])
-    else:
-        # Fallback to old behavior if no validator image
-        return np.array([reward(self.mapbytes, response) for response in responses])
+
+    return np.array([reward(validator_image, response) for response in responses])

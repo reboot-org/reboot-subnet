@@ -78,7 +78,7 @@ class Validator(BaseValidatorNeuron):
         
         return actions
 
-    def run_job(self, actions=None):
+    def run_job(self, actions):
         home_path = os.getenv("HOME")
         self.controller.start_container(environment={"TURTLEBOT3_MODE": "waffle_pi"}, volumes={f'{home_path}/.gz_validator': {'bind': '/root/.gz', 'mode': 'rw'}}, command="sleep infinity", clean_existing=True)
         self.controller.start_process(process_name="gazebo", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py > /root/ros2_ws/gz.log"')
@@ -88,15 +88,13 @@ class Validator(BaseValidatorNeuron):
         self.controller.start_process(process_name="cartographer", command='bash -c "/usr/local/bin/docker-entrypoint.sh xvfb-run -a ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True > /root/ros2_ws/cartographer.log"')
         time.sleep(5)
 
-        # Execute robot movement if actions are provided
-        if actions:
-            actions_json = json.dumps(actions)
-            actions_b64 = base64.b64encode(actions_json.encode('utf-8')).decode('utf-8')
-            result = self.controller.execute_command(
-                command=f'bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/robot_movement.py --base64 \'{actions_b64}\'"'
-            )
-            bt.logging.info(f"Robot movement executed: {result}")
-            time.sleep(5)
+        actions_json = json.dumps(actions)
+        actions_b64 = base64.b64encode(actions_json.encode('utf-8')).decode('utf-8')
+        result = self.controller.execute_command(
+            command=f'bash -c "/usr/local/bin/docker-entrypoint.sh python3 /root/ros2_ws/src/api_server/robot_movement.py --base64 \'{actions_b64}\'"'
+        )
+        bt.logging.info(f"Robot movement executed: {result}")
+        time.sleep(5)
 
         image_path="/tmp/camera_image.png"
         result = self.controller.execute_command(
