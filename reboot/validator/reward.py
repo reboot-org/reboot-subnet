@@ -22,6 +22,7 @@ from PIL import Image
 import io
 import time
 import base64
+from pixelmatch.contrib.PIL import pixelmatch
 
 def calculate_image_similarity(img1_bytes: bytes, img2_bytes: bytes) -> float:
     """
@@ -39,33 +40,21 @@ def calculate_image_similarity(img1_bytes: bytes, img2_bytes: bytes) -> float:
         img1 = Image.open(io.BytesIO(img1_bytes))
         img2 = Image.open(io.BytesIO(img2_bytes))
         
-        # Convert to grayscale and resize to same size for comparison
-        img1_gray = img1.convert('L')
-        img2_gray = img2.convert('L')
-        
         # Resize to same dimensions (use the smaller size)
-        min_width = min(img1_gray.width, img2_gray.width)
-        min_height = min(img1_gray.height, img2_gray.height)
+        min_width = min(img1.width, img2.width)
+        min_height = min(img1.height, img2.height)
         
-        img1_resized = img1_gray.resize((min_width, min_height))
-        img2_resized = img2_gray.resize((min_width, min_height))
+        img1_resized = img1.resize((min_width, min_height))
+        img2_resized = img2.resize((min_width, min_height))
+        img_diff = Image.new("RGBA", img1_resized.size)
+
+        mismatch = pixelmatch(img1_resized, img2_resized, img_diff)
+
+        score = float(1-(mismatch/(min_width*min_height)))
         
-        # Convert to numpy arrays
-        img1_array = np.array(img1_resized, dtype=np.float32)
-        img2_array = np.array(img2_resized, dtype=np.float32)
-        
-        # Normalize to [0, 1]
-        img1_array = img1_array / 255.0
-        img2_array = img2_array / 255.0
-        
-        # Calculate Mean Squared Error (MSE)
-        mse = np.mean((img1_array - img2_array) ** 2)
-        
-        # Convert MSE to similarity score (0 = identical, 1 = completely different)
-        # Use exponential decay to convert MSE to similarity
-        similarity = np.exp(-mse * 10)  # Scale factor of 10 for better sensitivity
-        
-        return float(similarity)
+        if score < 0.6:
+            score = 0
+        return score
         
     except Exception as e:
         bt.logging.warning(f"Error calculating image similarity: {e}")
@@ -98,12 +87,10 @@ def reward(validator_image_bytes: bytes, synapse: RobotSynapse) -> float:
     # Calculate image similarity (0.0 to 1.0)
     similarity_score = calculate_image_similarity(validator_camera_bytes, miner_camera_bytes)
     
-    if similarity_score < 0.7:
-        similarity_score = 0
-
     # Get processing time from dendrite
-    processing_time = getattr(synapse.dendrite, 'process_time', None)
+    processing_time = getattr(synapse.dendrite, 'process_time', 100000)
     
+
     final_reward = similarity_score
     
     bt.logging.info(f"Similarity: {similarity_score:.3f}, Final reward: {final_reward:.3f}")
