@@ -52,7 +52,7 @@ def calculate_image_similarity(img1_bytes: bytes, img2_bytes: bytes) -> float:
 
         score = float(1-(mismatch/(min_width*min_height)))
         
-        if score < 0.6:
+        if score < 0.9:
             score = 0
         return score
         
