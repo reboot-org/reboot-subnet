@@ -136,7 +136,7 @@ class TaskManager:
 class ActionModel(BaseModel):
     """Action model for robot actions"""
     type: str = Field(..., description="Type of action (move_forward, move_backward, turn_left, turn_right, stop)")
-    speed: float = Field(default=0.5, ge=0.0, le=1.0, description="Speed of the action")
+    speed: float = Field(default=0.5, ge=0.0, le=5.0, description="Speed of the action")
     duration: float = Field(default=1.0, gt=0.0, description="Duration of the action in seconds")
 
 
