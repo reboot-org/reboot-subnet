@@ -593,6 +593,8 @@ class DockerController:
             # Write archive data
             archive_data = b''.join(archive_stream)
             
+            archive_stream.close()
+
             if extract_tar:
                 # Extract tar archive
                 with tarfile.open(fileobj=BytesIO(archive_data), mode='r') as tar:
@@ -603,7 +605,8 @@ class DockerController:
                     for member in tar.getmembers():
                         if member.isfile():
                             # Extract file
-                            file_data = tar.extractfile(member).read()
+                            with tar.extractfile(member) as file_obj:
+                                file_data = file_obj.read()
                             
                             # Determine target path
                             if len(tar.getmembers()) == 1:
@@ -660,15 +663,17 @@ class DockerController:
             # Get archive from container
             archive_stream, _ = self.container.get_archive(container_path)
             archive_data = b''.join(archive_stream)
-            
+            archive_stream.close()
+
             # Extract file content from tar
             with tarfile.open(fileobj=BytesIO(archive_data), mode='r') as tar:
                 # Get first file
                 for member in tar.getmembers():
                     if member.isfile():
-                        file_data = tar.extractfile(member).read()
-                        self.logger.info(f"Content download completed: {container_path}")
-                        return file_data
+                        with tar.extractfile(member) as file_obj:
+                            file_data = file_obj.read()
+                            self.logger.info(f"Content download completed: {container_path}")
+                            return file_data
             
             self.logger.warning(f"No file found in archive: {container_path}")
             return None
